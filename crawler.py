@@ -4,23 +4,63 @@ import re
 from bs4 import BeautifulSoup
 import argparse
 import os
+from urllib.parse import urlsplit
+from live import LoadingBar
+from colorama import Fore
+import json
+
+
+def display_head():
+    print("""
+ ▄████████    ▄████████    ▄████████  ▄█     █▄   ▄█          ▄████████    ▄████████ 
+███    ███   ███    ███   ███    ███ ███     ███ ███         ███    ███   ███    ███ 
+███    █▀    ███    ███   ███    ███ ███     ███ ███         ███    █▀    ███    ███ 
+███         ▄███▄▄▄▄██▀   ███    ███ ███     ███ ███        ▄███▄▄▄      ▄███▄▄▄▄██▀ 
+███        ▀▀███▀▀▀▀▀   ▀███████████ ███     ███ ███       ▀▀███▀▀▀     ▀▀███▀▀▀▀▀   
+███    █▄  ▀███████████   ███    ███ ███     ███ ███         ███    █▄  ▀███████████ 
+███    ███   ███    ███   ███    ███ ███ ▄█▄ ███ ███▌    ▄   ███    ███   ███    ███ 
+████████▀    ███    ███   ███    █▀   ▀███▀███▀  █████▄▄██   ██████████   ███    ███ 
+             ███    ███                          ▀                        ███    ███ 
+
+Made by Mattheo. D 
+          """)
 
 parser = argparse.ArgumentParser(prog="CRAWLER", description="Create a Tree of the webpage with all the information you got from one page")
 parser.add_argument("--url", required=True, help="The url of the page you wanna analyse")
+parser.add_argument("--headers")
 
+display_head()
 
 args = parser.parse_args()
+
+#headers = json.parse(args.headers)
 
 
 trees = {}
 queues = []
 trash_links = []
 
+# def split_url(url):
+#     rep = re.findall("(https?://[^/]+)(/.*)?", url)
+#     if len(rep) == 1:
+#         return rep[0]
+#     return None
 def split_url(url):
-    rep = re.findall("(https?://[^/]+)(/.*)", url)
-    if len(rep) == 1:
-        return rep[0]
-    return None
+    """
+    Splits a URL into its base (scheme + domain) and relative path.
+
+    :param url: The full URL to split.
+    :return: A tuple (base_url, relative_path) or None if the input is invalid.
+    """
+    try:
+        parsed = urlsplit(url)  # Parse the URL into components
+        base_url = f"{parsed.scheme}://{parsed.netloc}"  # Construct the base URL
+        relative_path = parsed.path if parsed.path else "/"
+        return base_url, relative_path
+    except Exception as e:
+        print(f"Error parsing URL: {e}")
+        return None
+
 
 def isAbsolute(url):
     return re.match("^ *https?://", url) != None
@@ -31,8 +71,6 @@ def splitOptionOnUrl(url):
         return rep[0]
     return None
 
-
-import os
 
 def rel2rel(original, relative):
     """
@@ -58,7 +96,7 @@ def rel2rel(original, relative):
 def rel2url(original_url, original_relative):
     absolute, relativeWithOption = split_url(original_url)
     relative, option = splitOptionOnUrl(relativeWithOption)
-    rel = rel2rel(os.path.dirname(relative), original_relative)
+    rel = rel2rel(os.path.dirname(os.path.normpath(relative)), original_relative)
     return absolute+rel+option
 
 def addTree(relative):
@@ -73,7 +111,7 @@ def addTree(relative):
         if depth == len(relative)-1:
             if not path in current_level.keys():
                 isItNew = True
-                current_level[path] = "file"
+                current_level[path] = {}
         else:
             if not path in current_level.keys():
                 current_level[path] = {}
@@ -94,7 +132,7 @@ def get_all_link(html, original_absolute, original_relative):
     relatives_result = []
 
 
-    links_abs = re.findall(r"https?://(?:[a-zA-Z0-9-_]+\.)+[a-zA-Z0-9-_]+(?::[0-9]{1,5})?(?:/[^\"' ]*)?", html)
+    links_abs = re.findall(r"https?://(?:[a-zA-Z0-9-_]+\.?)+[a-zA-Z0-9-_]+(?::[0-9]{1,5})?(?:/[^\"' ]*)?", html)
     for link in links_abs:
         absolute, relativeWithOption = split_url(link)
         # ou alors on trie autrement mais la
@@ -102,7 +140,8 @@ def get_all_link(html, original_absolute, original_relative):
         if absolute == original_absolute:
             links_result.append(link)
         else:
-            trash_links.append(link)
+            if link not in trash_links:
+                trash_links.append(link)
     
 
 
@@ -134,12 +173,12 @@ def get_all_link(html, original_absolute, original_relative):
                 if absolute == original_absolute:
                     links_result.append(relative)
                 else:
-                    trash_links.append(relative)
+                    if relative not in trash_links:
+                        trash_links.append(relative)
             else:
                 #relative link
                 relative = rel2rel(original_relative, relative)
                 if addTree(relative):
-                    # if it's a new link
                     queues.append(relative)
                 relatives_result.append(relative)
             
@@ -161,10 +200,16 @@ def get_page(url):
     relative, option = splitOptionOnUrl(relativeWithOption)
     addTree(relative)
 
-    rep = requests.get(url)
+    rep = requests.get(url,verify=False, allow_redirects=False)
+    if rep.status_code in [301, 302, 303, 307, 308]:
+        #analyse even if it's a redirection
+        absolute,relative = split_url(url)
+        redirection_relative = rel2rel(os.path.dirname(os.path.normpath(relative)), rep.headers['Location'])
+        addTree(redirection_relative)
+        redirection = absolute+redirection_relative
     #test if everything is alright
     html = rep.text
-    get_all_link(html, absolute, os.path.dirname(relative))
+    get_all_link(html, absolute, os.path.dirname(os.path.normpath(relative)))
 
 def display_tree(d, prefix=""):
     """
@@ -184,7 +229,26 @@ def display_liste(liste):
     for elt in liste:
         print(" - "+elt)
 
-get_page(args.url)
+
+#get_page(args.url)
+bar = LoadingBar(100, prefix="Processing", length=40, color=Fore.MAGENTA)
+
+max_steps = 0
+# main loop with queues
+while True:
+    if len(queues) >= 1:
+        current = queues[0]
+        url = original+current
+        get_page(url)
+        max_steps = max(len(queues), max_steps)
+        bar.setTotal(max_steps)
+        #print(max_steps - len(queues))
+        bar.update(max_steps - len(queues))
+        del queues[0]
+        continue
+    break
+
+bar.finish()
 
 print("The trees of the website:")
 display_tree(trees)
@@ -194,17 +258,17 @@ print("Queues:")
 display_liste(queues)
 
 
-url = absolute+queues[0]
-print(url)
-rep = requests.get(url, allow_redirects=False)
+# url = absolute+queues[0]
+# print(url)
+# rep = requests.get(url, allow_redirects=False)
 
-if rep.status_code in [301, 302, 303, 307, 308]:
-    #analyse even if it's a redirection
-    print(rep.text)
-    absolute,relative = split_url(url)
-    redirection_relative = rel2rel(os.path.dirname(relative), rep.headers['Location'])
-    addTree(redirection_relative)
-    redirection = absolute+redirection_relative
-    print(f"Redirected to: {redirection}")
-else:
-    print("No redirection occurred.")
+# if rep.status_code in [301, 302, 303, 307, 308]:
+#     #analyse even if it's a redirection
+#     print(rep.text)
+#     absolute,relative = split_url(url)
+#     redirection_relative = rel2rel(os.path.dirname(relative), rep.headers['Location'])
+#     addTree(redirection_relative)
+#     redirection = absolute+redirection_relative
+#     print(f"Redirected to: {redirection}")
+# else:
+#     print("No redirection occurred.")
