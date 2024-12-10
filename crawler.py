@@ -5,6 +5,8 @@ from bs4 import BeautifulSoup
 import argparse
 import os
 from urllib.parse import urlsplit
+import urllib3
+urllib3.disable_warnings()
 from live import LoadingBar
 from colorama import Fore
 import json
@@ -22,7 +24,6 @@ def display_head():
 ████████▀    ███    ███   ███    █▀   ▀███▀███▀  █████▄▄██   ██████████   ███    ███ 
              ███    ███                          ▀                        ███    ███ 
 
-Made by Mattheo. D 
           """)
 
 parser = argparse.ArgumentParser(prog="CRAWLER", description="Create a Tree of the webpage with all the information you got from one page")
@@ -33,12 +34,16 @@ display_head()
 
 args = parser.parse_args()
 
-#headers = json.parse(args.headers)
+headers = {}
+if args.headers:
+    headers = json.loads(args.headers)
 
 
 trees = {}
 queues = []
 trash_links = []
+current_index = 0
+page_to_see = 1
 
 # def split_url(url):
 #     rep = re.findall("(https?://[^/]+)(/.*)?", url)
@@ -127,12 +132,12 @@ original = absolute
 
 #get all the link a (relative/absolute)
 def get_all_link(html, original_absolute, original_relative):
-    global trash_links, queues
+    global trash_links, queues, page_to_see
     links_result = []
     relatives_result = []
 
 
-    links_abs = re.findall(r"https?://(?:[a-zA-Z0-9-_]+\.?)+[a-zA-Z0-9-_]+(?::[0-9]{1,5})?(?:/[^\"' ]*)?", html)
+    links_abs = re.findall(r"https?://(?:[a-zA-Z0-9-_]+\.?)+[a-zA-Z0-9-_]+(?::[0-9]{1,5})?(?:/[^\"' \n]*)?", html)
     for link in links_abs:
         absolute, relativeWithOption = split_url(link)
         # ou alors on trie autrement mais la
@@ -179,6 +184,7 @@ def get_all_link(html, original_absolute, original_relative):
                 #relative link
                 relative = rel2rel(original_relative, relative)
                 if addTree(relative):
+                    page_to_see+=1
                     queues.append(relative)
                 relatives_result.append(relative)
             
@@ -196,22 +202,26 @@ def get_all_link(html, original_absolute, original_relative):
 #get by redirection
 
 def get_page(url):
+    global queues, page_to_see
     absolute, relativeWithOption = split_url(url)
     relative, option = splitOptionOnUrl(relativeWithOption)
     addTree(relative)
 
-    rep = requests.get(url,verify=False, allow_redirects=False)
+    rep = requests.get(url,headers=headers, verify=False, allow_redirects=False)
     if rep.status_code in [301, 302, 303, 307, 308]:
         #analyse even if it's a redirection
         absolute,relative = split_url(url)
         redirection_relative = rel2rel(os.path.dirname(os.path.normpath(relative)), rep.headers['Location'])
-        addTree(redirection_relative)
+
+        if addTree(redirection_relative):
+            page_to_see+=1
+            queues.append(redirection_relative)
         redirection = absolute+redirection_relative
     #test if everything is alright
     html = rep.text
     get_all_link(html, absolute, os.path.dirname(os.path.normpath(relative)))
 
-def display_tree(d, prefix=""):
+def display_tree_old(d, prefix=""):
     """
     Recursively display a dictionary as a tree structure.
 
@@ -221,9 +231,30 @@ def display_tree(d, prefix=""):
     for key, value in d.items():
         if isinstance(value, dict):  # If it's a folder
             print(f"{prefix}📂 {key}")
-            display_tree(value, prefix + "   ")  # Recurse with increased indentation
+            display_tree_old(value, prefix + "   ")  # Recurse with increased indentation
         else:  # If it's a file
             print(f"{prefix}📄 {key}")
+
+def display_tree(d, prefix=""):
+    """
+    Recursively display a dictionary as a tree structure with arrows,
+    distinguishing between files and folders.
+
+    :param d: The dictionary representing the tree structure.
+    :param prefix: The string prefix for the current level of the tree.
+    """
+    last_key = list(d.keys())[-1]  # Identify the last key to determine the arrow type
+    for key, value in d.items():
+        # Choose the arrow style based on whether this is the last item
+        connector = "└──" if key == last_key else "├──"
+        
+        # Determine if the current item is a file or a folder
+        if isinstance(value, dict) and value:  # Non-empty dictionary (folder)
+            print(f"{prefix}{connector} 📂 {key}")
+            sub_prefix = prefix + ("    " if key == last_key else "│   ")
+            display_tree(value, sub_prefix)
+        else:  # Empty dictionary or non-dictionary item (file)
+            print(f"{prefix}{connector} 📄 {key}")
 
 def display_liste(liste):
     for elt in liste:
@@ -234,16 +265,21 @@ def display_liste(liste):
 bar = LoadingBar(100, prefix="Processing", length=40, color=Fore.MAGENTA)
 
 max_steps = 0
+
+print("Looking for all the pages of the website...")
 # main loop with queues
 while True:
     if len(queues) >= 1:
         current = queues[0]
         url = original+current
         get_page(url)
+        current_index +=1
         max_steps = max(len(queues), max_steps)
-        bar.setTotal(max_steps)
+        #bar.setTotal(max_steps)
+        bar.setTotal(page_to_see)
         #print(max_steps - len(queues))
-        bar.update(max_steps - len(queues))
+        #bar.update(max_steps - len(queues))
+        bar.update(current_index)
         del queues[0]
         continue
     break
