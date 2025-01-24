@@ -1,6 +1,21 @@
 # CRAWLER
 
+```bash
+
+ ▄████████    ▄████████    ▄████████  ▄█     █▄   ▄█          ▄████████    ▄████████ 
+███    ███   ███    ███   ███    ███ ███     ███ ███         ███    ███   ███    ███ 
+███    █▀    ███    ███   ███    ███ ███     ███ ███         ███    █▀    ███    ███ 
+███         ▄███▄▄▄▄██▀   ███    ███ ███     ███ ███        ▄███▄▄▄      ▄███▄▄▄▄██▀ 
+███        ▀▀███▀▀▀▀▀   ▀███████████ ███     ███ ███       ▀▀███▀▀▀     ▀▀███▀▀▀▀▀   
+███    █▄  ▀███████████   ███    ███ ███     ███ ███         ███    █▄  ▀███████████ 
+███    ███   ███    ███   ███    ███ ███ ▄█▄ ███ ███▌    ▄   ███    ███   ███    ███ 
+████████▀    ███    ███   ███    █▀   ▀███▀███▀  █████▄▄██   ██████████   ███    ███ 
+             ███    ███                          ▀                        ███    ███ 
+
+```
+
 A powerful and flexible web crawler that recursively explores a website, extracts useful data (URLs, images, scripts, forms, etc.), and displays the structure of the pages. It allows you to perform content searches, download website resources, and export crawled URLs.
+
 
 ## Features
 
