@@ -12,6 +12,20 @@ from colorama import Fore
 import json
 
 
+def display_warning():
+    print("""
+########################################################################
+#                           ⚠ WARNING ⚠                               #
+########################################################################
+# The use of the argument '--headers' or certain authentication tokens #
+# in your crawler could trigger unintended actions on the target site. #
+#                                                                      #
+# Double-check your headers and payloads to avoid harmful requests.    #
+#                                                                      #
+# Always test responsibly and avoid sending sensitive data.            #
+########################################################################
+    """)
+
 def display_head():
     print("""
  ▄████████    ▄████████    ▄████████  ▄█     █▄   ▄█          ▄████████    ▄████████ 
@@ -28,9 +42,12 @@ def display_head():
 
 parser = argparse.ArgumentParser(prog="CRAWLER", description="Create a Tree of the webpage with all the information you got from one page")
 parser.add_argument("--url", required=True, help="The url of the page you wanna analyse")
-parser.add_argument("--headers")
+parser.add_argument("--headers", help="Add headers into all the request")
+parser.add_argument("--random-agent", help="Makes the user agent random")
 
 display_head()
+#display_warning()
+#only display if --headers is used and then asked if continue or not
 
 args = parser.parse_args()
 
@@ -275,10 +292,7 @@ while True:
         get_page(url)
         current_index +=1
         max_steps = max(len(queues), max_steps)
-        #bar.setTotal(max_steps)
         bar.setTotal(page_to_see)
-        #print(max_steps - len(queues))
-        #bar.update(max_steps - len(queues))
         bar.update(current_index)
         del queues[0]
         continue
@@ -292,19 +306,3 @@ print("Links not belonging to the page: ")
 display_liste(trash_links)
 print("Queues:")
 display_liste(queues)
-
-
-# url = absolute+queues[0]
-# print(url)
-# rep = requests.get(url, allow_redirects=False)
-
-# if rep.status_code in [301, 302, 303, 307, 308]:
-#     #analyse even if it's a redirection
-#     print(rep.text)
-#     absolute,relative = split_url(url)
-#     redirection_relative = rel2rel(os.path.dirname(relative), rep.headers['Location'])
-#     addTree(redirection_relative)
-#     redirection = absolute+redirection_relative
-#     print(f"Redirected to: {redirection}")
-# else:
-#     print("No redirection occurred.")
