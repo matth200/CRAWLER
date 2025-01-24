@@ -63,6 +63,7 @@ parser.add_argument("--random-agent", help="Makes the user agent random", action
 parser.add_argument("--search", help="Regex to search in all the website") # to do
 parser.add_argument("--download", help="Specify a directory to download all the website content") # to do
 parser.add_argument("-f", help="No need for input by the user, it will be okay for everything", action='store_true')
+parser.add_argument("--export-urls", help="Export all the url that you have crawled")
 
 display_head()
 
@@ -399,6 +400,14 @@ print("Links not belonging to the page: ")
 display_liste(trash_links)
 print("Trash datas not supported:")
 display_liste(trash_datas)
+
+
+if args.export_urls:
+    print(f"Saving all the urls inside {args.export_urls}...")
+    with open(args.export_urls, "w") as file:
+        for url in information_tree.keys():
+            file.write(url+"\n")
+
 # print("Queues:")
 # display_liste(queues)
 
