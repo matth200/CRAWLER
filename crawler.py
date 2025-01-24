@@ -176,6 +176,7 @@ def addTree(relative):
                 current_level[path] = {}
                 isItNew = True
             current_level = current_level[path]
+    #log(f"addTree: {relative}")
     return isItNew
 
 absolute, relative = split_url(args.url)
@@ -272,7 +273,7 @@ def get_all_link(html, original_absolute, original_relative):
 #get by redirection
 
 def get_page(url):
-    global queues, page_to_see
+    global queues, page_to_see, information_tree
     absolute, relativeWithOption = split_url(url)
     relative, option = splitOptionOnUrl(relativeWithOption)
     addTree(relative)
@@ -289,6 +290,11 @@ def get_page(url):
             queues.append(redirection_relative)
         redirection = absolute+redirection_relative
     #test if everything is alright
+    log(f"get_page: {url} -> {relativeWithOption}")
+    information_tree[relativeWithOption] = {
+        "url": url,
+        "code": rep.status_code
+    }
     html = rep.text
     get_all_link(html, absolute, os.path.dirname(os.path.normpath(relative)))
 
@@ -306,7 +312,7 @@ def display_tree_old(d, prefix=""):
         else:  # If it's a file
             print(f"{prefix}📄 {key}")
 
-def display_tree(d, prefix=""):
+def display_tree(d,prec="/", prefix=""):
     """
     Recursively display a dictionary as a tree structure with arrows,
     distinguishing between files and folders.
@@ -323,9 +329,13 @@ def display_tree(d, prefix=""):
         if isinstance(value, dict) and value:  # Non-empty dictionary (folder)
             print(f"{prefix}{connector} 📂 {key}")
             sub_prefix = prefix + ("    " if key == last_key else "│   ")
-            display_tree(value, sub_prefix)
+            display_tree(value, prec+key+"/", sub_prefix)
         else:  # Empty dictionary or non-dictionary item (file)
-            print(f"{prefix}{connector} 📄 {key}")
+            elt = prec+key
+            try:
+                print(f"{prefix}{connector} 📄 {key} --> {information_tree[elt]['url']}")
+            except:
+                print(f"{prefix}{connector} 📄 {key} --> {elt}")
 
 def display_liste(liste):
     for elt in liste:
