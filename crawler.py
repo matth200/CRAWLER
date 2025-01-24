@@ -11,14 +11,14 @@ from live import LoadingBar
 from colorama import Fore
 import json
 import random
-
+import sys
 
 def log(texte):
     with open("log.txt", "a+") as file:
         file.write(texte+"\n")
 
 
-def display_warning():
+def display_warning(force):
     print("""
 ########################################################################
 #                           ⚠ WARNING ⚠                               #
@@ -31,6 +31,16 @@ def display_warning():
 # Always test responsibly and avoid sending sensitive data.            #
 ########################################################################
     """)
+
+    if not force:
+        while True:
+            response = input("Do you want to continue even if this can cause harm to the system ? (Y/n)\n")
+            if response.lower() == "y" or response.lower() == "n":
+                break
+        if response == "n":
+            print("Okay byebye...")
+            sys.exit()
+        print("You accepted the risk, let's continue!")
 
 def display_head():
     print("""
@@ -50,16 +60,18 @@ parser = argparse.ArgumentParser(prog="CRAWLER", description="Create a Tree of t
 parser.add_argument("--url", required=True, help="The url of the page you wanna analyse")
 parser.add_argument("--headers", help="Add headers into all the request")
 parser.add_argument("--random-agent", help="Makes the user agent random", action='store_true')
+parser.add_argument("--search", help="Regex to search in all the website") # to do
+parser.add_argument("--download", help="Specify a directory to download all the website content") # to do
+parser.add_argument("-f", help="No need for input by the user, it will be okay for everything", action='store_true')
 
 display_head()
-#display_warning()
-#only display if --headers is used and then asked if continue or not
 
 args = parser.parse_args()
 
 headers = {}
 user_agent = "crawler"
 if args.headers:
+    display_warning(args.f)
     headers = json.loads(args.headers)
 if args.random_agent:
     with open("misc/user_agents.txt", "r") as file:
@@ -133,7 +145,7 @@ def rel2rel(original, relative):
     # Normalize and join the paths
     result = os.path.normpath(os.path.join(original, relative))
 
-    log("rel2rel: {} {} -> {}".format(original, relative, result))
+    #log("rel2rel: {} {} -> {}".format(original, relative, result))
     
     return result
 
