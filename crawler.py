@@ -1,5 +1,5 @@
 #!/bin/python3
-from colorama import Back, Style, init
+from colorama import Back, Style, Fore
 import requests
 import re
 import argparse
@@ -89,6 +89,7 @@ headers["user-agent"] = user_agent
 
 trees = {}
 information_tree = {}
+searchs = [] # variable to store search parameter
 queues = []
 trash_links = []
 trash_datas = []
@@ -118,6 +119,17 @@ page_to_see = 1
 #         return None
     
 
+def search_on_data(search, data, page):
+    global searchs
+    regex = f'{search}'
+    elts = re.findall(search, data, re.DOTALL | re.IGNORECASE)
+
+    if len(elts) > 0:
+        searchs.append({
+            "data": elts,
+            "page": page
+        })
+
 def split_url(url):
     """
     Splits a URL into its base (scheme + domain) and relative path.
@@ -126,9 +138,14 @@ def split_url(url):
     :return: A tuple (base_url, relative_path) or None if the input is invalid.
     """
     try:
+        url = url.strip()
         parsed = urlsplit(url)  # Parse the URL into components
         base_url = f"{parsed.scheme}://{parsed.netloc}"  # Construct the base URL
-        relative_path = url[len(base_url):]
+        if base_url == "://":
+            base_url = ""
+            relative_path = url
+        else:
+            relative_path = url[len(base_url):]
         return base_url, relative_path
     except Exception as e:
         print(f"Error parsing URL: {e}")
@@ -205,8 +222,8 @@ def isDataRelativeOk(relative):
     # if you got a link like data: base64... or mailto: mattheo@test.fr or javascript: ...
     # Define a regex pattern to capture scheme and data
     scheme_pattern = re.compile(r'^([a-zA-Z]+) ?:(.+)', re.IGNORECASE)
-    # Allow only "mailto" scheme, block others
-    whitelist = ["mailto", "http", "https"]
+    # Allow only "http, https" scheme, block others
+    whitelist = ["http", "https", "ws", "wss"]
     match = scheme_pattern.match(relative)
     if match:
         scheme = match.group(1).lower()
@@ -300,6 +317,7 @@ def get_page(url):
     if rep.status_code in [301, 302, 303, 307, 308]:
         #analyse even if it's a redirection
         absolute,relative = split_url(url)
+        #if isAbsolute(rep.headers['Location']):
         absolute_redirect,relative_redirect = split_url(rep.headers['Location'])
         redirection_relative = rel2rel(os.path.dirname(os.path.normpath(relative)), relative_redirect)
 
@@ -316,6 +334,8 @@ def get_page(url):
     if redirection:
         information_tree[relativeWithOption]["redirection"] = redirection
     html = rep.text
+    if args.search:
+        search_on_data(args.search, html, url)
     get_all_link(html, absolute, os.path.dirname(os.path.normpath(relative)))
 
 def display_tree_old(d, prefix=""):
@@ -411,6 +431,15 @@ if args.export_urls:
 # print("Queues:")
 # display_liste(queues)
 
+def display_search():
+    print("Searchs:")
+    for elt in searchs:
+        print(f"{Fore.CYAN}{elt['page']}{Style.RESET_ALL}")
+        for found in elt['data']:
+            print(f"> {found}")
+
+if args.search:
+    display_search()
 
 #to debug
 # for key in information_tree.keys():
