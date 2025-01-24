@@ -12,6 +12,11 @@ from colorama import Fore
 import json
 
 
+def log(texte):
+    with open("log.txt", "a+") as file:
+        file.write(texte+"\n")
+
+
 def display_warning():
     print("""
 ########################################################################
@@ -78,6 +83,7 @@ def split_url(url):
         parsed = urlsplit(url)  # Parse the URL into components
         base_url = f"{parsed.scheme}://{parsed.netloc}"  # Construct the base URL
         relative_path = parsed.path if parsed.path else "/"
+        #log("split_url: {} -> {} {}".format(url, base_url, relative_path))
         return base_url, relative_path
     except Exception as e:
         print(f"Error parsing URL: {e}")
@@ -111,6 +117,8 @@ def rel2rel(original, relative):
     
     # Normalize and join the paths
     result = os.path.normpath(os.path.join(original, relative))
+
+    log("rel2rel: {} {} -> {}".format(original, relative, result))
     
     return result
 
@@ -119,7 +127,9 @@ def rel2url(original_url, original_relative):
     absolute, relativeWithOption = split_url(original_url)
     relative, option = splitOptionOnUrl(relativeWithOption)
     rel = rel2rel(os.path.dirname(os.path.normpath(relative)), original_relative)
-    return absolute+rel+option
+    result = absolute+rel+option
+    #log(f"rel2url: {original_url} {original_relative} -> {result}")
+    return result
 
 def addTree(relative):
     global trees
@@ -146,6 +156,19 @@ addTree(relative)
 queues = [relative]
 original = absolute
 
+def isDataRelativeOk(relative):
+    # if you got a link like data: base64... or mailto: mattheo@test.fr or javascript: ...
+    # Define a regex pattern to capture scheme and data
+    scheme_pattern = re.compile(r'^([a-zA-Z]+) ?:(.+)', re.IGNORECASE)
+    # Allow only "mailto" scheme, block others
+    whitelist = ["mailto"]
+    match = scheme_pattern.match(relative)
+    if match:
+        scheme = match.group(1).lower()
+        if scheme in whitelist:
+            return True
+        return False
+    return True
 
 #get all the link a (relative/absolute)
 def get_all_link(html, original_absolute, original_relative):
@@ -188,22 +211,23 @@ def get_all_link(html, original_absolute, original_relative):
     lists = [action_relative, href_relative, src_relative]
     for list_relative in lists:
         for relative in list_relative:
-            if isAbsolute(relative):
-                absolute, relativeWithOption = split_url(relative)
-                # ou alors on trie autrement mais la
-                # on essaye de garder uniquement les éléments d'une même page
-                if absolute == original_absolute:
-                    links_result.append(relative)
+            if isDataRelativeOk(relative):
+                if isAbsolute(relative):
+                    absolute, relativeWithOption = split_url(relative)
+                    # ou alors on trie autrement mais la
+                    # on essaye de garder uniquement les éléments d'une même page
+                    if absolute == original_absolute:
+                        links_result.append(relative)
+                    else:
+                        if relative not in trash_links:
+                            trash_links.append(relative)
                 else:
-                    if relative not in trash_links:
-                        trash_links.append(relative)
-            else:
-                #relative link
-                relative = rel2rel(original_relative, relative)
-                if addTree(relative):
-                    page_to_see+=1
-                    queues.append(relative)
-                relatives_result.append(relative)
+                    #relative link
+                    relative = rel2rel(original_relative, relative)
+                    if addTree(relative):
+                        page_to_see+=1
+                        queues.append(relative)
+                    relatives_result.append(relative)
             
 
     # print(relatives_result)
@@ -228,7 +252,8 @@ def get_page(url):
     if rep.status_code in [301, 302, 303, 307, 308]:
         #analyse even if it's a redirection
         absolute,relative = split_url(url)
-        redirection_relative = rel2rel(os.path.dirname(os.path.normpath(relative)), rep.headers['Location'])
+        absolute_redirect,relative_redirect = split_url(rep.headers['Location'])
+        redirection_relative = rel2rel(os.path.dirname(os.path.normpath(relative)), relative_redirect)
 
         if addTree(redirection_relative):
             page_to_see+=1
