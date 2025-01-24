@@ -1,7 +1,7 @@
 #!/bin/python3
+from colorama import Back, Style, init
 import requests
 import re
-from bs4 import BeautifulSoup
 import argparse
 import os
 from urllib.parse import urlsplit
@@ -99,6 +99,24 @@ page_to_see = 1
 #     if len(rep) == 1:
 #         return rep[0]
 #     return None
+# def split_url(url):
+#     """
+#     Splits a URL into its base (scheme + domain) and relative path.
+
+#     :param url: The full URL to split.
+#     :return: A tuple (base_url, relative_path) or None if the input is invalid.
+#     """
+#     try:
+#         parsed = urlsplit(url)  # Parse the URL into components
+#         base_url = f"{parsed.scheme}://{parsed.netloc}"  # Construct the base URL
+#         relative_path = parsed.path if parsed.path else "/"
+#         #log("split_url: {} -> {} {}".format(url, base_url, relative_path))
+#         return base_url, relative_path
+#     except Exception as e:
+#         print(f"Error parsing URL: {e}")
+#         return None
+    
+
 def split_url(url):
     """
     Splits a URL into its base (scheme + domain) and relative path.
@@ -109,13 +127,11 @@ def split_url(url):
     try:
         parsed = urlsplit(url)  # Parse the URL into components
         base_url = f"{parsed.scheme}://{parsed.netloc}"  # Construct the base URL
-        relative_path = parsed.path if parsed.path else "/"
-        #log("split_url: {} -> {} {}".format(url, base_url, relative_path))
+        relative_path = url[len(base_url):]
         return base_url, relative_path
     except Exception as e:
         print(f"Error parsing URL: {e}")
         return None
-
 
 def isAbsolute(url):
     return re.match("^ *https?://", url) != None
@@ -279,6 +295,7 @@ def get_page(url):
     addTree(relative)
 
     rep = requests.get(url,headers=headers, verify=False, allow_redirects=False)
+    redirection = False
     if rep.status_code in [301, 302, 303, 307, 308]:
         #analyse even if it's a redirection
         absolute,relative = split_url(url)
@@ -290,11 +307,13 @@ def get_page(url):
             queues.append(redirection_relative)
         redirection = absolute+redirection_relative
     #test if everything is alright
-    log(f"get_page: {url} -> {relativeWithOption}")
+    #log(f"get_page: {url} -> {relativeWithOption}")
     information_tree[relativeWithOption] = {
         "url": url,
         "code": rep.status_code
     }
+    if redirection:
+        information_tree[relativeWithOption]["redirection"] = redirection
     html = rep.text
     get_all_link(html, absolute, os.path.dirname(os.path.normpath(relative)))
 
@@ -332,9 +351,19 @@ def display_tree(d,prec="/", prefix=""):
             display_tree(value, prec+key+"/", sub_prefix)
         else:  # Empty dictionary or non-dictionary item (file)
             elt = prec+key
-            try:
-                print(f"{prefix}{connector} 📄 {key} --> {information_tree[elt]['url']}")
-            except:
+            if elt in information_tree.keys():
+                color = Back.BLACK
+                if "code" in information_tree[elt].keys():
+                    if 200 <= information_tree[elt]["code"] < 300:
+                        color = Back.GREEN
+                    elif 300 <= information_tree[elt]["code"] < 400:
+                        color = Back.BLUE
+                    elif 400 <= information_tree[elt]["code"] < 500:
+                        color = Back.RED
+                    elif 500 <= information_tree[elt]["code"] < 600:
+                        color = Back.MAGENTA
+                print(f"{prefix}{connector} 📄 {key} --> {color} {information_tree[elt]} {Style.RESET_ALL}")
+            else:
                 print(f"{prefix}{connector} 📄 {key} --> {elt}")
 
 def display_liste(liste):
@@ -372,3 +401,8 @@ print("Trash datas not supported:")
 display_liste(trash_datas)
 # print("Queues:")
 # display_liste(queues)
+
+
+#to debug
+# for key in information_tree.keys():
+#     print(f"{key} - {information_tree[key]}")
