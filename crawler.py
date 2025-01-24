@@ -325,6 +325,16 @@ def get_page(url):
             page_to_see+=1
             queues.append(redirection_relative)
         redirection = absolute+redirection_relative
+    elif rep.status_code == 200 and args.download:
+        # download each file inside a folder
+        name = args.download+relativeWithOption
+        directory = os.path.dirname(name)
+        if not os.path.exists(directory):
+            os.makedirs(directory, exist_ok=True)
+        if name[-1] == "/":
+            name+="index.html"
+        with open(name, "wb") as file:
+            file.write(rep.content)
     #test if everything is alright
     #log(f"get_page: {url} -> {relativeWithOption}")
     information_tree[relativeWithOption] = {
