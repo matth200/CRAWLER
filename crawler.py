@@ -10,6 +10,7 @@ urllib3.disable_warnings()
 from live import LoadingBar
 from colorama import Fore
 import json
+import random
 
 
 def log(texte):
@@ -48,7 +49,7 @@ def display_head():
 parser = argparse.ArgumentParser(prog="CRAWLER", description="Create a Tree of the webpage with all the information you got from one page")
 parser.add_argument("--url", required=True, help="The url of the page you wanna analyse")
 parser.add_argument("--headers", help="Add headers into all the request")
-parser.add_argument("--random-agent", help="Makes the user agent random")
+parser.add_argument("--random-agent", help="Makes the user agent random", action='store_true')
 
 display_head()
 #display_warning()
@@ -57,13 +58,27 @@ display_head()
 args = parser.parse_args()
 
 headers = {}
+user_agent = "crawler"
 if args.headers:
     headers = json.loads(args.headers)
+if args.random_agent:
+    with open("misc/user_agents.txt", "r") as file:
+        user_agents = file.read().split("\n")
+        if user_agents[-1] == "":
+            user_agents = user_agents[:-1]
+        choice = random.randint(0, len(user_agents)-1)
+        user_agent = user_agents[choice]
+        print("User-Agent ->", user_agent)
 
+
+#get random user agent if needed
+headers["user-agent"] = user_agent
 
 trees = {}
+information_tree = {}
 queues = []
 trash_links = []
+trash_datas = []
 current_index = 0
 page_to_see = 1
 
@@ -161,7 +176,7 @@ def isDataRelativeOk(relative):
     # Define a regex pattern to capture scheme and data
     scheme_pattern = re.compile(r'^([a-zA-Z]+) ?:(.+)', re.IGNORECASE)
     # Allow only "mailto" scheme, block others
-    whitelist = ["mailto"]
+    whitelist = ["mailto", "http", "https"]
     match = scheme_pattern.match(relative)
     if match:
         scheme = match.group(1).lower()
@@ -228,6 +243,8 @@ def get_all_link(html, original_absolute, original_relative):
                         page_to_see+=1
                         queues.append(relative)
                     relatives_result.append(relative)
+            else:
+                trash_datas.append(relative)
             
 
     # print(relatives_result)
@@ -329,5 +346,7 @@ print("The trees of the website:")
 display_tree(trees)
 print("Links not belonging to the page: ")
 display_liste(trash_links)
-print("Queues:")
-display_liste(queues)
+print("Trash datas not supported:")
+display_liste(trash_datas)
+# print("Queues:")
+# display_liste(queues)
